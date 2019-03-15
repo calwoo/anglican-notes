@@ -1,6 +1,5 @@
 (ns bayesian.inference
-  (:require [anglican.runtime :refer [mean]]
-            [gorilla-plot.core :as plot]))
+  (:require [anglican.runtime :refer [mean]]))
 
 ;; normal distribution
 (defn normal-logpdf
@@ -82,3 +81,61 @@
 
 ;; question) what is the posterior distribution of x?
 
+;; initial value for MCMC sampler
+(def initial-value {:mu 0.0
+                    :sigma [10. 10. 10. 10. 10. 10. 10.]})
+
+;; log-joint distributions over all latent and observed variables
+(defn uniform-logp
+  "log-prob of uniform dist on [0, 25]"
+  [value]
+  (if (and (<= value 25) (<= 0 value))
+    (Math/log (/ 1. 25))
+    (Math/log 0.)))
+
+(defn log-joint
+  "Compute the joint log-probability of all random variables:
+   log p(mu, sigma_1, ..., sigm_7, y_1, ... y_7)
+   The input `value` has the form {:mu float :sigma [float ... float]}"
+  [value]
+  (let [mu (normal-logpdf (:mu value) 0 50)
+        sigmas (reduce + (map #(uniform-logp %) (:sigma value)))
+        obs (reduce +
+                    (map #(normal-logpdf %1 (:mu value) %2) measurements (:sigma value)))]
+    (+ mu sigmas obs)))
+
+;; define a proposal distribution
+(def epsilon-mu 0.5)
+(def epsilon-sigma 0.25)
+
+(defn propose
+  [prev-value]
+  (let [mu-bump (+ (randn 0 epsilon-mu) (:mu prev-value))
+        sigma-bumps (mapv #(+ % (randn 0 epsilon-sigma)) (:sigma prev-value))]
+    {:mu mu-bump :sigma sigma-bumps})) ;; proposal given by a slight gaussian bump
+
+;; acceptance ratio for MCMC sampler
+(defn acceptance-ratio
+  [prev-value new-value]
+  (let [prev-log-joint (log-joint prev-value)
+        new-log-joint (log-joint new-value)]
+    (Math/exp (min 0 (- new-log-joint prev-log-joint)))))
+
+;; draw N samples using Metropolis MCMC
+(def MCMC-samples
+  (loop [n N
+         value initial-value
+         samples (vector)]
+    (if (= n 0)
+      ;; return samples at end of loop
+      samples
+      ;; otherwise, propose a value
+      (let [proposed-value (propose value)
+            acc-ratio (acceptance-ratio value proposed-value)
+            p (rand)]
+        ;; using acceptance ratio, determine next value
+        (if (< p acc-ratio)
+          ;; if pass, recur with proposed value
+          (recur (- n 1) proposed-value (conj samples proposed-value))
+          ;; else
+          (recur (- n 1) value (conj samples value)))))))
