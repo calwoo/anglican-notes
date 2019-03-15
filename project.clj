@@ -5,7 +5,6 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [anglican "1.1.0"]]
-  :plugins [[dtolpin/lein-gorilla "0.4.1-SNAPSHOT"]]
-  :main ^:skip-aot bayesian.arithmetic-example
+  :main ^:skip-aot anglican.tutorial
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
